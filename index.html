@@ -10,6 +10,7 @@
             --bg: #fafafa; --text: #171717; --border: #e5e5e5;
             --card: #ffffff; --gray: #d4d4d4; --green: #10b981;
             --purple: #8b5cf6; --red: #ef4444;
+            --holiday-bg: #fef9c3; --holiday-text: #ca8a04;
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
@@ -27,7 +28,6 @@
         
         #menu-btn { font-size: 28px; cursor: pointer; user-select: none; line-height: 1; padding-left: 10px; }
 
-        /* Menu Suspenso */
         .dropdown-content {
             display: none; position: absolute; right: 0; top: 100%; margin-top: 10px;
             background: var(--card); box-shadow: 0 4px 12px rgba(0,0,0,0.1);
@@ -54,8 +54,10 @@
         .state-1 { background: var(--green); } .state-2 { background: var(--purple); } .state-3 { background: var(--red); }
 
         /* Calendário View */
-        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin: 0 20px; text-align: center; font-size: 10px; }
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin: 0 20px 20px; text-align: center; font-size: 10px; }
         .calendar-cell { border: 1px solid var(--border); border-radius: 6px; padding: 4px; min-height: 50px; background: var(--card); display: flex; flex-direction: column; align-items: center; }
+        .calendar-cell.holiday { background: var(--holiday-bg); border-color: var(--holiday-text); color: var(--holiday-text); font-weight: 800; }
+        .calendar-cell.inactive { background: transparent; border: none; }
         .status-line { height: 4px; border-radius: 2px; width: 100%; margin-top: 2px; }
 
         /* Planilha View */
@@ -141,15 +143,11 @@
             if (idx === 2) renderAbsences();
         }
 
-        // Fechar o menu se clicar em qualquer outro lugar da tela
         window.onclick = function(event) {
             if (!event.target.matches('#menu-btn')) {
                 let dropdowns = document.getElementsByClassName("dropdown-content");
                 for (let i = 0; i < dropdowns.length; i++) {
-                    let openDropdown = dropdowns[i];
-                    if (openDropdown.classList.contains('show')) {
-                        openDropdown.classList.remove('show');
-                    }
+                    if (dropdowns[i].classList.contains('show')) dropdowns[i].classList.remove('show');
                 }
             }
         }
@@ -197,19 +195,38 @@
         function renderCalendar() {
             const container = document.getElementById('calendar-container');
             container.innerHTML = '';
+            const daysOfWeek = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
+
             for (let m = 7; m <= 11; m++) {
-                let html = `<h3 style="margin:20px; text-align:center;">${new Date(2026,m,1).toLocaleString('pt-BR',{month:'long'}).toUpperCase()}</h3><div class="calendar-grid">`;
-                for(let d=1; d<=new Date(2026,m+1,0).getDate(); d++){
-                    let date = new Date(2026,m,d), dStr = toISOLocal(date);
-                    if(date.getDay()>=1 && date.getDay()<=4 && !holidays[dStr]){
-                        html += `<div class="calendar-cell">${d}<div style="display:flex; flex-direction:column; width:100%">`;
+                let monthDate = new Date(2026, m, 1);
+                let html = `<h3 style="margin:20px; text-align:center;">${monthDate.toLocaleString('pt-BR',{month:'long'}).toUpperCase()}</h3><div class="calendar-grid">`;
+                
+                daysOfWeek.forEach(day => html += `<div style="font-weight:bold; color:#737373; padding-bottom:5px;">${day}</div>`);
+
+                let firstDay = monthDate.getDay();
+                let lastDate = new Date(2026, m + 1, 0).getDate();
+
+                for(let i = 0; i < firstDay; i++) {
+                    html += `<div class="calendar-cell inactive"></div>`;
+                }
+
+                for(let d = 1; d <= lastDate; d++) {
+                    let date = new Date(2026, m, d), dStr = toISOLocal(date);
+                    let isHoliday = holidays[dStr];
+                    let cellClass = `calendar-cell ${isHoliday ? 'holiday' : ''}`;
+                    
+                    html += `<div class="${cellClass}">${d}`;
+                    
+                    if(date >= startDate && date <= endDate && date.getDay() >= 1 && date.getDay() <= 4 && !isHoliday) {
+                        html += `<div style="display:flex; flex-direction:column; width:100%; margin-top:2px;">`;
                         schedule[date.getDay()].forEach(sub => {
                             let state = attendance[`${dStr}-${sub.name}`] || 0;
                             let color = state==1?'var(--green)':state==2?'var(--purple)':state==3?'var(--red)':'var(--gray)';
                             html += `<div class="status-line" style="background:${color}"></div>`;
                         });
-                        html += `</div></div>`;
+                        html += `</div>`;
                     }
+                    html += `</div>`;
                 }
                 container.innerHTML += html + `</div>`;
             }
@@ -224,7 +241,9 @@
         renderApp();
         const todayStr = toISOLocal(new Date());
         const todayEl = document.getElementById(`day-${todayStr}`);
-        if(todayEl) todayEl.scrollIntoView({block:'center'});
+        if(todayEl) {
+            setTimeout(() => { todayEl.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 500);
+        }
     </script>
 </body>
 </html>
