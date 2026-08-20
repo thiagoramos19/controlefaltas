@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Controle de Faltas - UNIRIO</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #fafafa;
+            --text: #171717;
+            --border: #e5e5e5;
+            --card: #ffffff;
+            --gray: #d4d4d4;
+            --green: #10b981;
+            --purple: #8b5cf6;
+            --red: #ef4444;
+            --holiday-bg: #fef9c3;
+            --holiday-text: #ca8a04;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+        
+        body { background-color: var(--bg); color: var(--text); padding: 20px; padding-bottom: 80px; }
+        
+        h1 { font-size: 24px; font-weight: 800; text-align: center; margin-bottom: 24px; letter-spacing: -0.5px; }
+        
+        h2 { font-size: 18px; margin: 30px 0 15px; border-bottom: 2px solid var(--text); padding-bottom: 5px; }
+
+        .day-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        }
+
+        .day-card.holiday {
+            background: var(--holiday-bg);
+            border-color: var(--holiday-text);
+        }
+
+        .day-header { font-weight: 600; font-size: 14px; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .holiday-label { color: var(--holiday-text); font-size: 12px; margin-top: 4px; display: block; }
+
+        .subject-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-top: 1px solid var(--border);
+        }
+
+        .subject-row:first-of-type { border-top: none; }
+
+        .subject-info { display: flex; flex-direction: column; }
+        .subject-name { font-weight: 600; font-size: 16px; }
+        .subject-time { font-size: 12px; color: #737373; }
+
+        .status-box {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            background: var(--gray);
+            transition: all 0.2s ease;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 18px;
+            user-select: none;
+        }
+
+        .state-1 { background: var(--green); }
+        .state-2 { background: var(--purple); }
+        .state-3 { background: var(--red); }
+
+        .table-container { margin-top: 40px; overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; background: var(--card); border-radius: 8px; overflow: hidden; font-size: 14px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: var(--text); color: var(--card); font-weight: 600; }
+        .empty-state { text-align: center; padding: 20px; color: #737373; font-style: italic; }
+
+        .legend {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 24px;
+            font-size: 12px;
+        }
+        .legend-item { display: flex; align-items: center; gap: 6px; }
+        .legend-dot { width: 12px; height: 12px; border-radius: 3px; }
+    </style>
+</head>
+<body>
+
+    <h1>Controle de Faltas 💅</h1>
+
+    <div class="legend">
+        <div class="legend-item"><div class="legend-dot" style="background: var(--gray)"></div> Pendente</div>
+        <div class="legend-item"><div class="legend-dot" style="background: var(--green)"></div> Presente</div>
+        <div class="legend-item"><div class="legend-dot" style="background: var(--purple)"></div> Prof. faltou</div>
+        <div class="legend-item"><div class="legend-dot" style="background: var(--red)"></div> Faltei</div>
+    </div>
+
+    <div id="schedule-container"></div>
+
+    <h2>Planilha de Faltas</h2>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Data</th>
+                    <th>Matéria</th>
+                    <th>Motivo</th>
+                </tr>
+            </thead>
+            <tbody id="absences-body">
+                <!-- Preenchido via JS -->
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        const startDate = new Date(2026, 7, 17); // 17/08/2026 (Mês começa no 0)
+        const endDate = new Date(2026, 11, 11); // 11/12/2026
+        
+        const schedule = {
+            1: [{name: 'PI2', time: '16h'}, {name: 'PAA', time: '18h'}, {name: 'AGD', time: '20h'}], // Segunda
+            2: [{name: 'ES1', time: '16h'}, {name: 'PROB', time: '18h'}, {name: 'CIBER', time: '20h'}], // Terça
+            3: [{name: 'PI2', time: '16h'}, {name: 'PAA', time: '18h'}, {name: 'AGD', time: '20h'}], // Quarta
+            4: [{name: 'ES1', time: '16h'}, {name: 'PROB', time: '18h'}, {name: 'CIBER', time: '20h'}]  // Quinta
+        };
+
+        const holidays = {
+            '2026-09-07': 'Independência do Brasil',
+            '2026-10-12': 'Nossa Senhora Aparecida',
+            '2026-11-02': 'Finados'
+        };
+
+        let attendance = JSON.parse(localStorage.getItem('unirio_attendance')) || {};
+        let absences = JSON.parse(localStorage.getItem('unirio_absences')) || [];
+
+        function toISOLocal(d) {
+            const z = n => ('0' + n).slice(-2);
+            return `${d.getFullYear()}-${z(d.getMonth()+1)}-${z(d.getDate())}`;
+        }
+
+        function formatDateBR(dateStr) {
+            const [y, m, d] = dateStr.split('-');
+            return `${d}/${m}`;
+        }
+
+        function toggleState(id, subjectName, dateStr) {
+            let currentState = attendance[id] || 0;
+            let newState;
+            
+            // Ciclo: 0(Cinza) -> 1(Verde) -> 2(Roxo) -> 3(Vermelho) -> 1(Verde)
+            if (currentState === 0) newState = 1;
+            else if (currentState === 1) newState = 2;
+            else if (currentState === 2) newState = 3;
+            else if (currentState === 3) newState = 1;
+
+            if (newState === 3) {
+                let reason = prompt(`Faltou em ${subjectName} por quê, amada?`);
+                if (reason === null) return; // Cancelou o prompt
+                absences.push({ id, date: dateStr, subject: subjectName, reason: reason || "Sem motivo" });
+            } else if (currentState === 3 && newState === 1) {
+                absences = absences.filter(a => a.id !== id);
+            }
+
+            attendance[id] = newState;
+            saveData();
+            renderApp();
+        }
+
+        function saveData() {
+            localStorage.setItem('unirio_attendance', JSON.stringify(attendance));
+            localStorage.setItem('unirio_absences', JSON.stringify(absences));
+        }
+
+        function renderApp() {
+            const container = document.getElementById('schedule-container');
+            container.innerHTML = '';
+            
+            let current = new Date(startDate);
+            let currentMonth = -1;
+
+            while (current <= endDate) {
+                let dayOfWeek = current.getDay();
+                let dateStr = toISOLocal(current);
+                
+                // Só renderiza Seg(1) a Qui(4)
+                if (dayOfWeek >= 1 && dayOfWeek <= 4) {
+                    
+                    // Separador de mês
+                    if (current.getMonth() !== currentMonth) {
+                        currentMonth = current.getMonth();
+                        const monthName = current.toLocaleString('pt-BR', { month: 'long' }).toUpperCase();
+                        const monthHeader = document.createElement('h2');
+                        monthHeader.innerText = monthName;
+                        container.appendChild(monthHeader);
+                    }
+
+                    const isHoliday = holidays[dateStr];
+                    const dayName = current.toLocaleString('pt-BR', { weekday: 'short' });
+                    
+                    const card = document.createElement('div');
+                    card.className = `day-card ${isHoliday ? 'holiday' : ''}`;
+                    
+                    let html = `<div class="day-header">${formatDateBR(dateStr)} - ${dayName}`;
+                    if (isHoliday) html += `<span class="holiday-label">🎉 Feriado: ${isHoliday}</span>`;
+                    html += `</div>`;
+
+                    if (!isHoliday) {
+                        schedule[dayOfWeek].forEach(sub => {
+                            const id = `${dateStr}-${sub.name}`;
+                            const state = attendance[id] || 0;
+                            const icon = state === 1 ? '✓' : (state === 2 ? 'P' : (state === 3 ? '✕' : ''));
+                            
+                            html += `
+                                <div class="subject-row">
+                                    <div class="subject-info">
+                                        <span class="subject-name">${sub.name}</span>
+                                        <span class="subject-time">${sub.time}</span>
+                                    </div>
+                                    <div class="status-box state-${state}" onclick="toggleState('${id}', '${sub.name}', '${dateStr}')">
+                                        ${icon}
+                                    </div>
+                                </div>
+                            `;
+                        });
+                    }
+
+                    card.innerHTML = html;
+                    container.appendChild(card);
+                }
+                current.setDate(current.getDate() + 1);
+            }
+
+            renderAbsences();
+        }
+
+        function renderAbsences() {
+            const tbody = document.getElementById('absences-body');
+            tbody.innerHTML = '';
+
+            if (absences.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="3" class="empty-state">Nenhuma falta registrada. Continua assim! ✨</td></tr>`;
+                return;
+            }
+
+            // Ordenar faltas por data
+            absences.sort((a, b) => a.date.localeCompare(b.date)).forEach(ab => {
+                tbody.innerHTML += `
+                    <tr>
+                        <td>${formatDateBR(ab.date)}</td>
+                        <td><strong>${ab.subject}</strong></td>
+                        <td>${ab.reason}</td>
+                    </tr>
+                `;
+            });
+        }
+
+        renderApp();
+    </script>
+</body>
+</html>
