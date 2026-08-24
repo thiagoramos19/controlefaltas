@@ -1,4 +1,4 @@
-        <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
@@ -71,7 +71,7 @@
 
     <div class="header-fixed">
         <div class="header-top">
-            <h1>Faltas UNIRIO 💅</h1>
+            <h1 id="titulo-app">Faltas UNIRIO 💅</h1>
             <div style="position: relative;">
                 <div id="menu-btn" onclick="toggleMenu(event)">☰</div>
                 <div id="dropdown" class="dropdown-content">
@@ -108,6 +108,41 @@
     </div>
 
     <script>
+        // ==========================================
+        // 1. SISTEMA DE LOGIN COM SENHA
+        // ==========================================
+        const senhasPermitidas = {
+            "19092006": "Amanda",
+            "19032007": "Thiago"
+        };
+
+        let nomeUsuario = "";
+        
+        // Bloqueia a tela perguntando a senha até acertar
+        while (!nomeUsuario) {
+            let tentativa = prompt("🔒 Digite a sua senha de acesso:");
+            
+            if (tentativa === null) {
+                // Se a pessoa clicar em "Cancelar", a página fica em branco
+                document.body.innerHTML = "<h2 style='text-align:center; margin-top: 100px;'>Acesso Negado. Recarregue a página.</h2>";
+                throw new Error("Usuário cancelou o login");
+            }
+            
+            if (senhasPermitidas[tentativa]) {
+                nomeUsuario = senhasPermitidas[tentativa];
+                document.getElementById('titulo-app').innerText = `Faltas - ${nomeUsuario} 💅`;
+            } else {
+                alert("❌ Senha incorreta! Tente novamente.");
+            }
+        }
+
+        // ==========================================
+        // 2. CONFIGURAÇÕES GERAIS E PLANILHA
+        // ==========================================
+        
+        // COLE SUA URL AQUI DENTRO DAS ASPAS
+        const URL_DA_PLANILHA = "COLE_AQUI_A_URL_DO_APPS_SCRIPT_QUE_VOCE_GEROU";
+
         const startDate = new Date(2026, 7, 17);
         const endDate = new Date(2026, 11, 11);
         const schedule = {
@@ -118,8 +153,10 @@
         };
         const holidays = {'2026-09-07': 'Independência', '2026-10-12': 'N. Sra. Aparecida', '2026-11-02': 'Finados'};
 
-        let attendance = JSON.parse(localStorage.getItem('unirio_attendance')) || {};
-        let absences = JSON.parse(localStorage.getItem('unirio_absences')) || [];
+        // Busca os dados locais separados por usuário (para não misturar se usarem o mesmo celular)
+        let attendance = JSON.parse(localStorage.getItem(`unirio_attendance_${nomeUsuario}`)) || {};
+        let absences = JSON.parse(localStorage.getItem(`unirio_absences_${nomeUsuario}`)) || [];
+        
         const views = ['list-view', 'calendar-view', 'planilha-view'];
         let currentViewIdx = 0;
 
@@ -152,21 +189,77 @@
             }
         }
 
+        // ==========================================
+        // 3. COMUNICAÇÃO COM O GOOGLE
+        // ==========================================
+
+        function sincronizarComPlanilha() {
+            const titulo = document.getElementById('titulo-app');
+            titulo.innerHTML = `Faltas - ${nomeUsuario} 💅 <span style="font-size: 10px; color: gray;">(Salvando...)</span>`;
+
+            fetch(URL_DA_PLANILHA, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({ usuario: nomeUsuario, attendance: attendance, absences: absences })
+            })
+            .then(res => res.json())
+            .then(data => {
+                titulo.innerHTML = `Faltas - ${nomeUsuario} 💅`;
+            })
+            .catch(error => {
+                titulo.innerHTML = `Faltas - ${nomeUsuario} 💅 <span style="font-size: 10px; color: red;">(Erro)</span>`;
+            });
+        }
+
+        async function carregarDadosDaPlanilha() {
+            try {
+                // Puxa os dados específicos do usuário que logou
+                const response = await fetch(`${URL_DA_PLANILHA}?usuario=${encodeURIComponent(nomeUsuario)}`);
+                const data = await response.json();
+                
+                if(data && Object.keys(data.attendance || {}).length > 0) {
+                    attendance = data.attendance;
+                    absences = data.absences;
+                    
+                    // Salva localmente
+                    localStorage.setItem(`unirio_attendance_${nomeUsuario}`, JSON.stringify(attendance));
+                    localStorage.setItem(`unirio_absences_${nomeUsuario}`, JSON.stringify(absences));
+                    
+                    renderApp();
+                    if (currentViewIdx === 1) renderCalendar();
+                    if (currentViewIdx === 2) renderAbsences();
+                }
+            } catch (error) {
+                console.error("Não foi possível puxar da nuvem, usando dados offline.", error);
+            }
+        }
+
+        // ==========================================
+        // 4. LÓGICA E RENDERIZAÇÃO
+        // ==========================================
+
         function toggleState(id, subjectName, dateStr) {
             let currentState = attendance[id] || 0;
             let newState = (currentState + 1) % 4;
             absences = absences.filter(a => a.id !== id);
+            
             if (newState === 3) {
-                let reason = prompt(`Faltou em ${subjectName} por quê, amada?`);
+                let reason = prompt(`Faltou em ${subjectName} por quê?`);
                 if (reason === null) newState = 0;
                 else absences.push({ id, date: dateStr, subject: subjectName, reason: reason || "Sem motivo" });
             }
+            
             attendance[id] = newState;
-            localStorage.setItem('unirio_attendance', JSON.stringify(attendance));
-            localStorage.setItem('unirio_absences', JSON.stringify(absences));
+            
+            localStorage.setItem(`unirio_attendance_${nomeUsuario}`, JSON.stringify(attendance));
+            localStorage.setItem(`unirio_absences_${nomeUsuario}`, JSON.stringify(absences));
+            
             renderApp();
             if (currentViewIdx === 1) renderCalendar();
             if (currentViewIdx === 2) renderAbsences();
+
+            // Salva na nuvem ao alterar
+            sincronizarComPlanilha();
         }
 
         function renderApp() {
@@ -238,7 +331,10 @@
             absences.sort((a,b)=>a.date.localeCompare(b.date)).forEach(ab => tbody.innerHTML += `<tr><td>${ab.date.split('-')[2]}/${ab.date.split('-')[1]}</td><td>${ab.subject}</td><td>${ab.reason}</td></tr>`);
         }
 
+        // Inicia a aplicação
         renderApp();
+        carregarDadosDaPlanilha();
+
         const todayStr = toISOLocal(new Date());
         const todayEl = document.getElementById(`day-${todayStr}`);
         if(todayEl) {
